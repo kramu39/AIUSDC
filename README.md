@@ -1,158 +1,162 @@
 
-# AIUSD – Open Mint ERC20 Token on Base
+# AIUSD – Permissionless Mint ERC-20 Token on Base
 
-**AIUSD** is a simple, fully permissionless ERC20 token deployed on **Base Mainnet** (and optionally Base Sepolia testnet).
+AIUSD is an experimental ERC-20 token deployed on **Base** (an Ethereum L2 by Coinbase).  
 
-**Key characteristic**: **Anyone can mint unlimited tokens at any time** — there is no supply cap, no minter role, and no restrictions.
+**Core feature**: Completely open minting — **anyone** can mint any amount of tokens to any address at any time, with **no cap, no roles required, and no restrictions**.
 
-→ This makes it extremely experimental / meme / test-oriented.  
-→ **Not suitable** for serious value storage, stablecoin use, or any financial purpose — supply can (and likely will) inflate to infinity very quickly.
+This design makes AIUSD a radical experiment in unrestricted tokenomics — more meme/art/test oriented than a traditional utility/financial token.
 
-## 🚨 Important Warnings
+## Project Goals & Philosophy
 
-- **Unlimited minting**: Any address can call `mint(address to, uint256 amount)` without permission.
-- **No supply cap** — total supply starts at whatever you premint (default: 0) and can grow forever.
-- **Pausable** — Deployer (admin) can pause transfers/minting/burning in emergencies.
-- **Burnable** — Holders can burn their own tokens.
-- **Use at your own risk** — This token has **no economic guarantees** and can become worthless instantly.
-- **Audit status**: None — deployed as-is for learning/experimentation.
+- Demonstrate a maximally permissive ERC-20 implementation using OpenZeppelin standards.
+- Explore what happens in a truly open-supply environment (hyper-inflation risk, spam minting, community reactions).
+- Serve as a learning/reference repo for:
+  - Foundry-based development workflow
+  - OpenZeppelin ERC20 + extensions (Pausable, Burnable, AccessControl)
+  - Deployment to Base Mainnet/Sepolia
+  - Basic testing patterns
+- Provide a minimal, auditable starting point that others can fork/modify.
 
-## Token Info (Mainnet)
+**Not intended for**:
+- Real economic value
+- Stablecoin mechanics
+- DeFi primitives
+- Anything requiring scarcity or controlled issuance
 
-- **Network**: Base Mainnet (Chain ID: 8453)
-- **Contract Address**: `0x4d1136234F488068d905ba0a4885dA1E04EaB1a3`
-- **Explorer**: [https://basescan.org/address/0x4d1136234f488068d905ba0a4885da1e04eab1a3](https://basescan.org/address/0x4d1136234f488068d905ba0a4885da1e04eab1a3)
-- **Token Name / Symbol**: AIUSD / AIUSD
-- **Decimals**: 18
-- **Initial Supply**: 0 (no premint)
-- **Deployer / Admin / Pauser**: `0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38`
-- **Verification**: Source code verified on Basescan
-- **Features**: Open minting, pausable, burnable, role-based admin (only for pause/unpause)
+## Token Specification
 
-## Features
+| Property              | Value                          | Notes                                                                 |
+|-----------------------|--------------------------------|-----------------------------------------------------------------------|
+| Network               | Base Mainnet (Chain ID 8453)   | Also deployable to Base Sepolia (84532)                               |
+| Contract Address      | `0x4d1136234F488068d905ba0a4885dA1E04EaB1a3` | [Basescan](https://basescan.org/address/0x4d1136234f488068d905ba0a4885da1e04eab1a3) |
+| Name                  | AIUSD                          |                                                                       |
+| Symbol                | AIUSD                          |                                                                       |
+| Decimals              | 18                             | Standard ERC-20                                                       |
+| Initial Supply        | 0                              | No premint — supply starts empty                                      |
+| Total Supply          | Dynamic (unlimited)            | Anyone can increase via `mint()`                                      |
+| Minting               | Permissionless                 | `mint(address to, uint256 amount)` — public, no checks                |
+| Burning               | Yes                            | Standard `burn(uint256)` & `burnFrom(address, uint256)`               |
+| Pausing               | Yes                            | Only by `PAUSER_ROLE` holder (deployer initially)                     |
+| Transfer Fees/Taxes   | None                           | Clean pass-through                                                    |
+| Upgradability         | No                             | Immutable deployment                                                  |
+| License               | MIT                            | Fully open                                                                |
 
-Built with **OpenZeppelin v5**:
+## Smart Contract Architecture
 
-- `ERC20` – standard token
-- `ERC20Burnable` – anyone can burn their tokens
-- `ERC20Pausable` – admin can pause all token operations
-- `AccessControl` – deployer has `DEFAULT_ADMIN_ROLE` & `PAUSER_ROLE`
-- `mint(address to, uint256 amount)` – **public, unrestricted**
-- No mint cap, no blacklist, no taxes, no fees
+- **Base**: OpenZeppelin Contracts v5.x (`^0.8.20`)
+- **Inherited Contracts**:
+  - `ERC20` — core token logic
+  - `ERC20Burnable` — self-burn & approved burn
+  - `ERC20Pausable` — emergency pause on transfers/mints/burns
+  - `AccessControl` — roles for pause/unpause (no minter role!)
+- **Key Functions**:
+  - `mint(address to, uint256 amount)` — public → anyone calls
+  - `pause()` / `unpause()` — restricted to `PAUSER_ROLE`
+  - Standard: `transfer`, `approve`, `transferFrom`, `balanceOf`, `allowance`, etc.
+- **Overrides**: `_update()` hooks pausable logic (required in OZ v5)
 
-Solidity version: `^0.8.20`
+Source: [`src/AIUSD.sol`](./src/AIUSD.sol)
 
-## Project Structure
+## Security & Risk Considerations
 
-```
-AIUSD/
-├── src/
-│   └── AIUSD.sol               # The contract
-├── script/
-│   └── DeployAIUSD.s.sol       # Foundry deployment script
-├── test/                       # (add your tests here if you want)
-├── foundry.toml
-├── .env.example
-└── README.md
-```
+**Critical risks** (intentional design):
 
-## Prerequisites
+- **Unlimited inflation** — supply can reach astronomical numbers in minutes via spam minting.
+- **Value dilution** — any perceived value evaporates quickly.
+- **No recovery** — paused transfers still allow minting unless fully paused (but pause is admin-only).
 
-- [Foundry](https://getfoundry.sh/) installed
-- Base RPC endpoints (Mainnet & Sepolia)
-- Basescan API key (for verification)
-- Wallet private key with ETH on Base
+**Mitigations** (limited):
 
-## Environment Variables (.env)
+- Deployer retains `PAUSER_ROLE` & `DEFAULT_ADMIN_ROLE` → can pause in emergency.
+- Anyone (including deployer) can renounce roles later via `renounceRole(...)`.
+- No hidden admin functions, no owner mint, no blacklist.
 
-Create `.env` from `.env.example`:
+**Recommendation**: Treat this token as a **social experiment / art piece / test artifact** — **never** send meaningful ETH or assets to associated addresses/pools.
 
-```bash
-PRIVATE_KEY=0xYourPrivateKeyHere
-BASE_MAINNET_RPC_URL=https://mainnet.base.org
-BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
-BASESCAN_API_KEY=YourBaseScanApiKeyHere
-# Optional:
-# INITIAL_SUPPLY=1000000000000000000000000   # e.g. 1_000_000 tokens
-```
+No formal audit — use at your own extreme risk.
 
-## Deployment
+## Getting Started (Development)
 
-### 1. Base Mainnet (already deployed)
+### Prerequisites
 
-```bash
-source .env
+- [Foundry](https://getfoundry.sh/) (`forge`, `cast`, `anvil`)
+- Git
+- Base RPC endpoints & Basescan API key
 
-forge script script/DeployAIUSD.s.sol:DeployAIUSD \
-  --rpc-url $BASE_MAINNET_RPC_URL \
-  --broadcast \
-  --verify \
-  --etherscan-api-key $BASESCAN_API_KEY \
-  --chain-id 8453 \
-  -vvvv
-```
-
-Deployed address: **`0x4d1136234F488068d905ba0a4885dA1E04EaB1a3`**
-
-### 2. Base Sepolia (Testnet)
+### Setup
 
 ```bash
-forge script script/DeployAIUSD.s.sol:DeployAIUSD \
-  --rpc-url $BASE_SEPOLIA_RPC_URL \
-  --broadcast \
-  --verify \
-  --etherscan-api-key $BASESCAN_API_KEY \
-  --chain-id 84532 \
-  -vvvv
+git clone https://github.com/kramu39/AIUSDC.git
+cd AIUSDC
+forge install
+cp .env.example .env     # fill in PRIVATE_KEY, RPCs, BASESCAN_API_KEY
 ```
 
-(Get testnet ETH from faucets like https://www.base.org/faucets)
+### Useful Commands
 
-### 3. Deploy with premint (example: 1,000 tokens)
+| Action                        | Command                                                                 |
+|-------------------------------|-------------------------------------------------------------------------|
+| Compile                       | `forge build`                                                           |
+| Run tests                     | `forge test -vvv`                                                       |
+| Deploy to Base Sepolia        | `forge script script/DeployAIUSD.s.sol --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast --verify --etherscan-api-key $BASESCAN_API_KEY --chain-id 84532` |
+| Deploy to Base Mainnet        | Same as above, but `--rpc-url $BASE_MAINNET_RPC_URL --chain-id 8453`   |
+| Mint tokens (via cast)        | `cast send 0x4d11... "mint(address,uint256)" 0xYourAddress 1ether --rpc-url ... --private-key ...` |
+| Pause contract                | `cast send 0x4d11... "pause()" --rpc-url ... --private-key ...`        |
 
-```bash
-export INITIAL_SUPPLY=1000000000000000000000
+## Testing
 
-forge script ...   # rest of command
-```
+See [`test/AIUSD.t.sol`](./test/AIUSD.t.sol) — covers:
 
-## Interacting with the Contract
+- Permissionless minting (fuzzed & unit)
+- Pausing / unpausing behavior
+- Burning (self & approved)
+- Role checks
+- Standard ERC-20 transfers / approvals
 
-After deployment:
+Run with gas report: `forge test --gas-report`
 
-- Mint tokens (anyone): `mint(address to, uint256 amount)`
-- Pause (admin only): `pause()`
-- Unpause (admin only): `unpause()`
-- Burn your tokens: `burn(uint256 amount)` or `burnFrom(address, uint256)`
+## Deployment History
 
-Use:
-- Basescan "Write Contract" tab
-- Cast (Foundry): `cast send 0x4d11... --rpc-url ... "mint(address,uint256)" 0xYourAddress 1000000000000000000`
-- Wallet (MetaMask + custom token)
+- **Base Mainnet**  
+  Address: `0x4d1136234F488068d905ba0a4885dA1E04EaB1a3`  
+  Deployer: `0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38` (also initial admin/pauser)  
+  Tx: (link from Basescan once confirmed)  
+  Initial supply: 0
 
-## Security & Recommendations
+- **Base Sepolia**  
+  (Deploy if needed for testing — update here with address)
 
-- **Do NOT** send real value to this token without understanding the risks.
-- Anyone can mint → expect spam minting → token dilution.
-- If spam becomes problematic → call `pause()` from deployer account.
-- Consider renouncing admin role later (if desired): `renounceRole(DEFAULT_ADMIN_ROLE, msg.sender)`
-- For production tokens → add caps, roles, audits, etc.
-- Never reuse this exact setup for anything valuable.
+## Interacting with AIUSD
 
-## Next Steps / Ideas
+1. Add token to wallet: Use contract address + 18 decimals
+2. Mint: Call `mint` directly via wallet (e.g. MetaMask → Write Contract) or cast
+3. Pause: Only deployer (or role holder) can call `pause()`
+4. Verify on Basescan: Source is already verified
 
-- Add unit tests (`forge test`)
-- Deploy frontend / dApp to interact (mint button, pause toggle)
-- Create liquidity pool on Uniswap/Base DEX (if you want any trading)
-- Experiment with burning mechanisms or funny mint restrictions
-- Fork & modify (e.g. add max supply, only-self-mint, permit, etc.)
+## Future Ideas / Extensions
+
+- Add mint logging events or funny on-chain messages
+- Implement a humorous "anti-spam" delay (e.g. cooldown per address)
+- Deploy a companion NFT collection that "reacts" to mints
+- Build a simple frontend dApp (React + wagmi/viem) for one-click minting
+- Experiment with self-destruct or burn-all mechanics
+- Fork versions: capped supply, role-based mint, permit support, etc.
+
+## Contributing
+
+This is an open experiment — feel free to fork, PR improvements, or create variants.
+
+Issues/PRs welcome for:
+- Better tests / invariants
+- Gas optimizations
+- Documentation enhancements
+- Safety features (without removing core permissionlessness)
 
 ## License
 
-MIT – feel free to copy, modify, destroy, meme, whatever.
+MIT License — do whatever you want.
 
-Made with Foundry + OpenZeppelin on Base.  
-
-
-Good luck and stay experimental!
+Built by **Ramu** in Nairobi, February 2026.  
+Deployed on Base. Experiment responsibly .
 
